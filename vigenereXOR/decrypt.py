@@ -109,3 +109,5 @@ if __name__ == "__main__":
     print(decrypt(C1))
     print("\nSecond message:\n")
     print(decrypt(C2))
+    print("\nRandom ciphertext:\n")
+    print(decrypt(RANDOM))
