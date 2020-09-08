@@ -1,3 +1,5 @@
+#!/opt/python/latest/bin/python3
+
 import random
 import string
 import numpy as np
@@ -47,6 +49,9 @@ RANDOM = "".join([random.choice(string.hexdigits) for _ in range(400)]).upper()
 
 
 def lp(bag):
+    """
+    This probability is based on the dirichlet distribution.
+    """
     log_probability = loggamma(bag + 1).sum(axis=1)
     log_probability += loggamma(bag.shape[0])
 
@@ -56,22 +61,26 @@ def lp(bag):
 
 
 def as_array(c):
-    pairs = np.array([int(hexc, base=0x10) for hexc in c], dtype=np.uint8).reshape((-1, 2))
+    pairs = np.array([int(hexc, base=0x10) for hexc in c], dtype=np.uint8).reshape(
+        (-1, 2)
+    )
     pairs[:, 0] *= 0x10
     return np.sum(pairs, axis=1)
 
 
 def cfreqs(a, l):
     # Make array divisible
-    padded = np.zeros((len(a) // l) * l + l, dtype="int64")
+    padded = np.repeat(0x100, (len(a) // l) * l + l)
     padded[: len(a)] = a
-    # Each chunk is encrypted with a different character
+
+    # everything in chunks[0] is encrypted with the first byte of the key
+    # everything in chunks[1] with the second... etc
     chunks = padded.reshape((l, -1), order="F")
 
     freqs = np.apply_along_axis(
-        lambda same_keyed: np.bincount(same_keyed, minlength=0x100), axis=1, arr=chunks
+        lambda same_keyed: np.bincount(same_keyed, minlength=0x101), axis=1, arr=chunks
     )
-    return freqs
+    return freqs[:, :0x100] # Ignore the last bin, which holds the padded values
 
 
 def decrypt(c):
@@ -80,9 +89,16 @@ def decrypt(c):
     length_scores[0] = -np.inf
     for l in range(1, int(len(a) / 1)):
         freqs = cfreqs(a, l)
-        # everything in chunks[0] is encrypted with the first byte of the key
-        # everything in chunks[1] with the second... etc
+
+        # Here I calculate a score for this key length with a different
+        # method as the one in the video.
+        # The score is the log-probability of each chunk being independently
+        # distributed (each chunk being presumably encrypted with a different
+        # character, and thus having differently distributed values).
+        # Basically, if a smaller amount of different values appear more often
+        # across all the chunks, the score is higher (akin to the inverse of entropy).
         score = np.sum(lp(freqs))
+
         length_scores[l] = score
     l = np.argmax(length_scores)
     freqs = cfreqs(a, l)
@@ -101,13 +117,16 @@ def decrypt(c):
 
     m = a ^ np.resize(key, len(a))
 
-    return ''.join([chr(i) for i in m]).replace('\x00', ' ')
+    return (key, "".join([chr(i) for i in m]).replace("\x00", " "))
 
 
 if __name__ == "__main__":
-    print("First message:\n")
-    print(decrypt(C1))
-    print("\nSecond message:\n")
-    print(decrypt(C2))
-    print("\nRandom ciphertext:\n")
-    print(decrypt(RANDOM))
+    key, m = decrypt(C1)
+    print(f"First message (key={key}):\n")
+    print(m)
+    key, m = decrypt(C2)
+    print(f"Second message (key={key}):\n")
+    print(m)
+    key, m = decrypt(RANDOM)
+    print(f"Random ciphertext (key={key}):\n")
+    print(m)
