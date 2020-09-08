@@ -122,11 +122,11 @@ def decrypt(c):
 
 if __name__ == "__main__":
     key, m = decrypt(C1)
-    print(f"First message (key={key}):\n")
+    print(f"\nFirst message (key={key}):\n")
     print(m)
     key, m = decrypt(C2)
-    print(f"Second message (key={key}):\n")
+    print(f"\nSecond message (key={key}):\n")
     print(m)
     key, m = decrypt(RANDOM)
-    print(f"Random ciphertext (key={key}):\n")
+    print(f"\nRandom ciphertext (key={key}):\n")
     print(m)
