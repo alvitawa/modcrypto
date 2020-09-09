@@ -3,7 +3,6 @@
 import random
 import string
 import numpy as np
-from scipy.stats import entropy
 from scipy.special import loggamma
 
 letterFrequency = {
@@ -98,7 +97,7 @@ def decrypt(c):
         # Basically, if a smaller amount of different values appear more often
         # across all the chunks, the score is higher (akin to the inverse of entropy).
         score = np.sum(lp(freqs))
-
+        
         length_scores[l] = score
     l = np.argmax(length_scores)
     freqs = cfreqs(a, l)
@@ -117,7 +116,9 @@ def decrypt(c):
 
     m = a ^ np.resize(key, len(a))
 
-    return (key, "".join([chr(i) for i in m]).replace("\x00", " "))
+    skey = hex(sum([ai*256**i for i,ai in enumerate(reversed(key))]))
+    sm = "".join([chr(i) for i in m]).replace("\x00", " ")
+    return (skey, sm)
 
 
 if __name__ == "__main__":

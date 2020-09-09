@@ -1,1 +1,1 @@
-Encrypt me
+Cryptography is the practice and study of techniques for, among other things, secure communicationin the presence of attackers. Cryptography has been used for hundreds, if not thousands, of years, buttraditional cryptosystems were designed and evaluated in a fairly ad hoc manner.  For example, theVigen`ere encryption scheme was thought to be secure for decades after it was invented, but we nowknow, and this exercise demonstrates, that it can be broken very easily.
