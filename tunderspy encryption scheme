@@ -1,0 +1,80 @@
+import random
+
+def Gen(p, l):
+    """Generate a key by uniformly choosing l elements in the multiplicative
+       group of integers modulo p, where p is prime."""
+    key = ""
+    for _ in range(l):
+        key += num_to_char(random.randint(1, p-1))
+    return key
+
+
+def Enc(p, key, message):
+    """Encrypt a message by multiplying the i'th element of the message by
+       the i'th element of the key modulo p."""
+    assert len(key) == len(message)
+
+    cipher = ""
+    for i in range(len(message)):
+        cipher += num_to_char((char_to_num(key[i]) * char_to_num(message[i])) % p)
+
+    return cipher
+
+
+def Euclid(e, p):
+    """Use Euclids' (extended) algorithm to determine the modular multiplicative
+       inverse of e modulo p."""
+    if e == 0:
+        return p, 0, 1
+
+    gcd, x1, y1 = Euclid(p % e, e)
+    x = y1 - (p//e) * x1
+    y = x1
+    return gcd, x, y
+
+
+def Dec(p, key, cipher):
+    """Decrypt a ciphertext by multiplying the i'th element of the cipher by
+       the modular multiplicative inverse of the i'th element of the key
+       modulo p. The inverse of an element modulo p is found by using Euclids'
+       algorithm."""
+    assert len(key) == len(cipher)
+
+    message = ""
+    for i in range(len(cipher)):
+        _, x, _ = Euclid(char_to_num(key[i]), p)
+
+        message += num_to_char((x * char_to_num(cipher[i])) % p)
+
+    return message
+
+def num_to_char(num):
+    """Map number to character."""
+    return chars[num - 1]
+
+def char_to_num(char):
+    """Map character to number in Z/pZ."""
+    return nums[char]
+
+# 28 different characters that can be used in message.
+chars = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
+         'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
+         ' ', '.']
+
+# Make a directory to switch from characters to numbers.
+nums = {}
+for i, char in enumerate(chars):
+    nums[char] = i + 1
+
+p = 29 # must be a prime number
+message = "hello hello hello world ....."
+
+# Generate a key.
+key = Gen(p, len(message))
+print(key)
+# Encrypt message with key.
+cipher = Enc(p, key, message)
+print(cipher)
+# Decrypt cipher with key.
+message2 = Dec(p, key, cipher)
+print(message2)
