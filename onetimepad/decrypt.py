@@ -1,6 +1,8 @@
 #!/opt/python/latest/bin/python3
 
 import numpy as np
+import itertools as it
+from scipy.sparse import csr_matrix
 from scipy.special import loggamma
 
 
@@ -32,14 +34,6 @@ def str_as_array(st):
 asciic = str_as_array(asciicommon)
 asciic2 = str_as_array(asciicommon2)
 
-def bfreqs(as_):
-    # everything in chunks[0] is encrypted with the first byte of the key
-    # everything in chunks[1] with the second... etc
-    chunks = as_.T.astype(np.int64)
-
-    freqs = np.apply_along_axis(lambda same_keyed: np.bincount(same_keyed, minlength=0x101), axis=1, arr=chunks)
-    return freqs[:, :0x100]  # Ignore the last bin, which holds the padded values
-
 def xorall(arr):
     repd = np.tile(arr, (arr.shape[0],1))
     return repd ^ repd.T
@@ -47,58 +41,60 @@ def xorall(arr):
 as_ = np.array([as_array(c) for c in cs])
 
 # note: it appears all values in each row/column are unique
-iix = xorall(asciic)
+iix = xorall(asciic2)
 
 # maski = np.mask_indices(asciic.shape[0], np.triu, k=1)
 
+info = []
 for b in as_.T:
     bbx = xorall(b)
 
-    scores = np.zeros((b.shape[0], asciic.shape[0]))
-    for cc in range(b.shape[0]):
-        for mc in range(asciic.shape[0]):
-            matches = [c in iix[mc] for c in bbx[cc]]
-            scores[cc, mc] = np.all(matches)
+    conjunction = []
+    # scores = np.zeros((b.shape[0], asciic.shape[0]))
+    for cc in range(bbx.shape[0]):
+        disjunction = []
+        for mc in range(iix.shape[0]):
+            # import pdb; pdb.set_trace()
+            # matches = [c in iix[mc] for c in bbx[cc]]
+            
+            info_matrix = iix[np.repeat(mc, bbx.shape[0])] == bbx[cc].reshape((-1, 1))
+            disjunction.append(info_matrix)
     
+        conjunction.append(np.array(disjunction))
+    conjunction = np.array(conjunction)
+    info.append(conjunction)
+        
+info = np.array(info)
 
-    import pdb; pdb.set_trace()
+def get_wheels(char_index):
+    conjunction = info[char_index]
+    for firstc in range(iix.shape[0]):
+        
+        # alla = conjunction[range(as_.shape[0]), [comb]]
+        info_matrix = conjunction[0, firstc] # set the first character, all the others follow
+        if not np.all(np.any(info_matrix, axis=1)):
+            # The character being tested on the first message cannot be firstc
+            continue
+        characters = np.argmax(info_matrix, axis=1)
+
+        # Only one character from a message determines all the others in the same position from different messages
+        assert np.all([np.argmax(conjunction[i, characters[i]], axis=1) for i in range(characters.shape[0])])
+
+        yield characters
+
+w0 = list(get_wheels(0))
+
+# attempt = np.zeros(as_.shape)-1
+
+# def set_part(start, string, cipher):
+#     arr = as_array(string)
+
+#     for conjunction in info[start:start+len(arr)]:
+
+#         alla = conjunction[range(as_.shape[0]), c]
 
 
+import pdb; pdb.set_trace()
 
-    # freqs = bfreqs(as_)
-    
-    # score_table = np.zeros((0x100, as_.shape[1]))
-    # # go through each possible key character
-    # # and evaluate how likely it is to be
-    # # the actual key character for each character in the key
-    # for i in range(0x100):
-    #     xored = np.arange(0x100, dtype=np.uint8) ^ i
-    #     ### TODO: Change score method to probabilistic
-    #     scores = np.sum(freqs[:, xored] * f_freq, axis=1)
-    #     score_table[i] = scores
-
-    # ### TODO: Try different configurations aided by the score table
-    # ### bring the *overall* ascii distribution closer to english
-    # keyx = np.argsort(-score_table.T, axis=1).astype(np.uint8).T
-    # import pdb; pdb.set_trace()
-    # # Pointers to the most likely key, which is the last
-    # keyi = np.zeros(keyx.shape[1], dtype=np.uint8)
-    # keys = []
-    # for _ in range(10000):
-    #     keys += [keyx[keyi, range(31)]]
-    #     up = score_table[keyi+1, range(31)] - score_table[keyi, range(31)]
-    #     keyi[np.argmax(up)] += 1
-
-    #     np.sum(freqs[:, keyi])
-
-    
-    # # import pdb; pdb.set_trace()
-
-    # for key in keys:
-    #     ms = [a ^ np.resize(key, len(a)) for a in as_]
-
-    #     skey = hex(sum([ai*256**i for i,ai in enumerate(reversed(key))]))
-    #     sms = ["".join([chr(i) for i in m]).replace("\x00", " ") for m in ms]
-    #     yield (sms)
 # http://www.fergemann.com/cryptology/otpcrack.html
 
