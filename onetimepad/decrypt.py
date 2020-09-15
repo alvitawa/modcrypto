@@ -5,12 +5,6 @@ import itertools as it
 from scipy.sparse import csr_matrix
 from scipy.special import loggamma
 
-
-asciicommon = "aeorisn1tl2md0cp3hbuk45g9687yfwjvzxqASERBTMLNPOIDCHGKFJUW.!Y*@V-ZQX_$#,/+?;^ %~=&`\)][:<(æ>\"ü|{'öä}"
-asciicommon2 = "aeorisn1tl2md0cp3hbuk45g9687yfwjvzxqASERBTMLNPOIDCHGKFJUW.!Y*@V-ZQX_$#,/+?;"
-
-
-
 cs = [
     "BB3A65F6F0034FA957F6A767699CE7FABA855AFB4F2B520AEAD612944A801E",
     "BA7F24F2A35357A05CB8A16762C5A6AAAC924AE6447F0608A3D11388569A1E",
@@ -31,8 +25,7 @@ def as_array(c):
 def str_as_array(st):
     return np.array([ord(x) for x in st])
 
-asciic = str_as_array(asciicommon)
-asciic2 = str_as_array(asciicommon2)
+asciiall = np.arange(0,0x100)
 
 def xorall(arr):
     repd = np.tile(arr, (arr.shape[0],1))
@@ -41,7 +34,7 @@ def xorall(arr):
 as_ = np.array([as_array(c) for c in cs])
 
 # note: it appears all values in each row/column are unique
-iix = xorall(asciic2)
+iix = xorall(asciiall)
 
 # maski = np.mask_indices(asciic.shape[0], np.triu, k=1)
 
@@ -71,7 +64,7 @@ def get_wheels(char_index):
     for firstc in range(iix.shape[0]):
         
         # alla = conjunction[range(as_.shape[0]), [comb]]
-        info_matrix = conjunction[0, firstc] # set the first character, all the others follow
+        info_matrix = conjunction[0, firstc] # set one message's character, all the others follow
         if not np.all(np.any(info_matrix, axis=1)):
             # The character being tested on the first message cannot be firstc
             continue
@@ -82,19 +75,50 @@ def get_wheels(char_index):
 
         yield characters
 
-w0 = list(get_wheels(0))
 
-# attempt = np.zeros(as_.shape)-1
+def get_wheel(char_index, char_value, message_index=0):
+    conjunction = info[char_index]
+    # alla = conjunction[range(as_.shape[0]), [comb]]
+    info_matrix = conjunction[message_index, char_value] # set one message's character, all the others follow
+    if not np.all(np.any(info_matrix, axis=1)):
+        # The character being tested on the first message cannot be firstc
+        return None
 
-# def set_part(start, string, cipher):
-#     arr = as_array(string)
+    characters = np.argmax(info_matrix, axis=1)
 
-#     for conjunction in info[start:start+len(arr)]:
+    return characters
 
-#         alla = conjunction[range(as_.shape[0]), c]
+def get_string_wheels(char_index, string, message_index):
+    wheels = []
+    for charx in range(string.shape[0]):
+        wheel = get_wheel(char_index+charx, string[charx], message_index)
+        if wheel is None:
+            return None
+        wheels.append(wheel)
+    return np.array(wheels)
 
+def as_ascii(m):
+    return "".join([chr(i) for i in m]).replace("\x00", " ")
 
-import pdb; pdb.set_trace()
+def string_score(string):
+    asc = as_ascii(string)
+    return np.mean([d.check(w) for w in asc.split(' ') if w != ''])
 
-# http://www.fergemann.com/cryptology/otpcrack.html
+attempt = np.repeat(-1, 31*7).reshape((7, 31))
 
+def set_char(char_index, char_value_ascii, message_index=0):
+    char_value = ord(char_value_ascii)
+    wheel = get_wheel(char_index, char_value, message_index)
+    if wheel is None:
+        raise Exception('Not possible')
+    attempt[:, char_index] = wheel
+
+def print_wheels(char_index):
+    wheels = get_wheels(char_index)
+    for wheel in wheels:
+        print(as_ascii(wheel))
+
+def print_attempt():
+    for s in attempt:
+        s[s == -1] = ord('?')
+        print(as_ascii(s))
