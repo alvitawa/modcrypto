@@ -46,16 +46,13 @@ def testc(catt):
     tatt = catt.flatten()
     return Oracle_Send(list(IV) + list(tatt), 3)
 
+datt = np.copy(m[1])
 for i in range(padding, 0x10):
-    # Create message with padding that is 1 byte longer
-    matt = np.copy(m)
-    matt[-1, -i-1] = padding
-    matt[-1, -i-1:] += 1
+    datt[-i-1] = padding
+    datt[-i-1:] += 1
     
-    # Calculate the cipher for the part of the message
-    # we know the pads for
     catt = np.copy(c)
-    catt[-1, -i:] = matt[-1, -i:] ^ pads[-1, -i:]
+    catt[0, -i:] ^= datt[-i:]
 
     # Try out different pads for the newly padded byte
     for p in range(0x100):
