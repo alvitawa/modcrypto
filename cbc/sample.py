@@ -18,16 +18,13 @@ c = [ctext[x:0x10+x] for x in range(0x10,len(ctext), 0x10)]
 
 m = [[-1] * 0x10 for _ in range(2)]
 
-# Nothing to do with the padding, just the one-time pad
-pads = [[-1] * 0x10 for _ in range(2)]
-
 IV = np.array(IV)
 c = np.array(c)
 m = np.array(m)
-pads = np.array(pads)
 
 Oracle_Connect()
 
+# Find the padding in the last block
 padding = 0
 for i in range(0x10):
     tatt = copy(ctext)
@@ -39,40 +36,71 @@ for i in range(0x10):
         break
 print "Padding: %d" % padding
 
-m[-1, -padding:] = [padding]*padding
-pads[-1, -padding:] = m[-1, -padding:] ^ c[-1, -padding:]
+m[1, -padding:] = [padding]*padding
 
 def testc(catt):
     tatt = catt.flatten()
     return Oracle_Send(list(IV) + list(tatt), 3)
 
-datt = np.copy(m[1])
-for i in range(padding, 0x10):
-    datt[-i-1] = padding
-    datt[-i-1:] += 1
+# Decrypt the last block back-to-front
+for l in range(padding, 0x10):
+    # Projected values
+    dil = np.repeat(0, 0x10)
+    dil[-l:] = l + 1
     
-    catt = np.copy(c)
-    catt[0, -i:] ^= datt[-i:]
+    # Real, known, values
+    dir_ = np.repeat(0, 0x10)
+    dir_[-padding:] = padding
+    dir_[-l:-padding] = m[1, -l:-padding]
 
-    # Try out different pads for the newly padded byte
-    for p in range(0x100):
-        catt[-1, -i-1] = matt[-1, -i-1] ^ p
-        rc = testc(catt)
+    ir = None
+    for i in range(0x100):
+        dil[-l-1] = i
+        tatt = np.array(ctext)
+        tatt[0x10:0x20] ^= dil ^ dir_
+        rc = Oracle_Send(list(tatt), 3)
         if rc:
-            print(i, p)
-    # Store the correct pad
-    pads[-1, -i-1] = p
-
-    import pdb; pdb.set_trace()
-
-m[-1] = c[-1] ^ pads[-1]
-
+            print 'm1: ', l, i
+            ir = i
+            break
+    
+    # import pdb; pdb.set_trace()
+    m[1, -l-1] = (l + 1) ^ ir
+    
 def decode(a):
     return ''.join(chr(x) for x in a)
-
+    
 print "Last block decrypted: %s" % decode(m[-1, :-padding]) 
 
-rc = Oracle_Send(ctext, 3)
-print "Oracle returned: %d" % rc
+# Do the same again to the first block, by acting as if 
+# the last block doesn't exist, and the padding was 0.
+for l in range(0, 0x10):
+    # Projected values
+    dil = np.repeat(0, 0x10)
+    dil[-l:] = l + 1
+    
+    # Real, known, values
+    dir_ = np.repeat(0, 0x10)
+    if l != 0:
+        dir_[-l:] = m[0, -l:]
+
+    ir = None
+    for i in range(0x100):
+        dil[-l-1] = i
+        tatt = np.array(ctext)
+        tatt[:0x10] ^= dil ^ dir_
+        rc = Oracle_Send(list(tatt[:0x20]), 2)
+        if rc:
+            print 'm0: ', l, i
+            ir = i
+            break
+    
+    # import pdb; pdb.set_trace()
+    m[0, -l-1] = (l + 1) ^ ir
+
+
+print "First block decrypted: %s" % decode(m[0]) 
+
+print "Complete message: \n\n\t%s\n\n" % decode(m.flatten())
 
 Oracle_Disconnect() 
